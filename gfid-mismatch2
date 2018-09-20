@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+
+# Take the outputs of `gfid-list' from many bricks and produce a list of
+# inodes with GFID problems, which can be of two types:
+# - Either a given file has different GFIDs on different bricks
+# - Or the number of GFIDs found is lower than the number of bricks
+#
+# Sample invocation
+# # gfid-mismatch -v gfid.1 gfid.2 gfid.3
+#
+# Output format:
+#
+# <Filename>: First GFID, Second GFID, ...
+# bin/bash: gfid.2 gfid.3 | gfid.1
+#
+# For each mismatched file, the existing GFIDs are shown
+
+import sys
+
+try:
+    from optparse import OptionParser
+except ImportError:
+    print "Error importing 'optparse'"
+
+def open_files(names):
+    """Open all the files and return the objects in a list"""
+
+    files = []
+
+    for name in names:
+        try:
+            files.append(file(name, "r"))
+        except IOError, (errno, msg):
+            print "Cannot open file %s: %s" % (name, msg)
+            sys.exit(2)
+
+    return files
+
+def all_lines_empty(lines):
+    for l in lines:
+        if l != '':
+            return False
+    return True
+
+def is_gfid(text):
+    """Return true if the text is a gfid. The validation is not strict. Anything other
+       than one of the *_missing strings is assumed to be a gfid"""
+
+    if not ((text == "inode_missing") or (text == "xattr_missing_key") or
+            (text == "xattr_missing_value")):
+        return True
+
+def detect_mismatches(files, options):
+    nb_bricks = len(files)
+    lines = reduce(lambda x, y: x+y, [[line for line in f] for f in files], [])
+    names = {}
+    for line in lines:
+        pieces = line.split(" ", 1)
+        name   = pieces[1][:-1]
+        if not is_gfid(pieces[0]):
+            continue
+        if name not in names:
+            names[name] = [pieces[0]]
+        else:
+            names[name].append(pieces[0])
+    for name, gfids in names.iteritems():
+        if (len(gfids) < nb_bricks) or len(set(gfids)) != 1:
+            if options.verbose:
+                print "%s: %s" % (name, ", ".join(gfids))
+            else:
+                print(name)
+
+
+def main():
+    usage  = "usage: %prog [options] <gfid-file-1> <gfid-file-2> ..."
+    parser = OptionParser(usage=usage)
+    parser.add_option("-v", "--verbose", action="store_true", dest="verbose",
+                      default=False,
+                      help="Show details of the mismatch by showing the existing GFIDs for each file")
+
+    (options, args) = parser.parse_args()
+
+    if (len(args) < 1):
+        parser.error("No filenames specified")
+
+    files = open_files(args)
+    detect_mismatches(files, options)
+
+if __name__ == "__main__":
+    main()
