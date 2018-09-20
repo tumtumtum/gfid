@@ -53,6 +53,13 @@ Now we're ready to identify the mismatched inodes:
 
 # gfid-mismatch brick1.gfid brick2.gfid brick3.gfid brick4.gfid > mismatched.txt
 
+Another script named gfid-mismatch2 allows to detect the inode that have
+missing gfid's or multiple gfid's for a same inode, in a context where bricks
+are really broken, with different set of files, in replicated or distributed
+(or both) mode:
+
+# gfid-mismatch2 brick1.gfid brick2.gfid brick3.gfid brick4.gfid > mismatched.txt
+
 This will generate the list of files with mismatched gfid's, one filename per line.
 
 We can delete the gfid's now by doing:
